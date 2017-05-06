@@ -663,8 +663,8 @@ int main(int argc, char **argv)
   /* Margins 2mm */
   memcpy(cmd_buffer + 25, "\x1b\x69\x64\x0e\x00", 5); 
 #else
-  /* Margins 32 pixels */
-  memcpy(cmd_buffer + 25, "\x1b\x69\x64\x20\x00", 5); 
+  /* Margins 10 pixels */
+  memcpy(cmd_buffer + 25, "\x1b\x69\x64\x0a\x00", 5);
 #endif
   /* Compression on */
   memcpy(cmd_buffer + 30, "\x4d\x02", 2);
