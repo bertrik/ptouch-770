@@ -460,21 +460,13 @@ int get_printer_status(int h, int query, int *media_width)
 /* main */
 int main(int argc, char **argv)
 {
-  int h, i, j, l, p, lp;
+  int h, i, j, l, p, lp, fi;
   unsigned char *data_buffer;
   FILE *f;
 
-  /* Open bitmap file, don't do anything with it yet */
   if(argc < 2)
     {
-      fprintf(stderr, "Usage: %s <file.pbm>\n", argv[0]);
-      return 1;
-    }
-
-  f = fopen(argv[1], "r");
-  if(!f)
-    {
-      fprintf(stderr, "Can't open bitmap file\n");
+      fprintf(stderr, "Usage: %s <file.pbm ...>\n", argv[0]);
       return 1;
     }
 
@@ -605,25 +597,15 @@ int main(int argc, char **argv)
       return 1;
     }
 
-  l = read_pbm_file(f, &data_buffer);
-  fclose(f);
-
-  p = ceil((MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
-  lp = l + p;
-
-  if(l < 0)
-    {
-      fprintf(stderr, "Can't read bitmap file\n");
-      return 1;
-    }
-
-  
   /* Dynamic command mode setting: raster */
   if(write_persist(h, "\x1b\x69\x61\x01", 4) != 4)
     {
       return 1;
     }
-  
+
+  /* Apparently a length of 0 just works. Great for multiple labels of different sizes. */
+  lp = 0;
+
   /*
     Print information (parameters) command:
     1: flags: printer recovery on, set media width,
@@ -673,34 +655,57 @@ int main(int argc, char **argv)
       return 1;
     }
 
-  /* Center with padding */
-  for (j = 0; j < p; j++)
+  for (fi = 1; fi < argc; fi++)
     {
-      write_persist(h, "\x5a", 1);
+      f = fopen(argv[fi], "r");
+      if(!f)
+        {
+          fprintf(stderr, "Can't open bitmap file %s\n", argv[fi]);
+          return 1;
+        }
+
+      l = read_pbm_file(f, &data_buffer);
+      fclose(f);
+
+      p = ceil((MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
+
+      if(l < 0)
+        {
+          fprintf(stderr, "Can't read bitmap file\n");
+          return 1;
+        }
+
+      /* Center with padding */
+      for (j = 0; j < p; j++)
+        {
+          write_persist(h, "\x5a", 1);
+          get_printer_status(h, 0, NULL);
+        }
+
+      /* Print graphic */
+      for(i = 0; i < l; i += 16)
+        {
+          write_rle(h, data_buffer + i, 16);
+          get_printer_status(h, 0, NULL);
+        }
+      free(data_buffer);
+
+      /* Center with padding */
+      for (j = 0; j < p; j++)
+        {
+          write_persist(h, "\x5a", 1);
+          get_printer_status(h, 0, NULL);
+        }
+
+      /* Print */
+      if(write_persist(h, fi == argc - 1 ? "\x1a" : "\x0c", 1) != 1)
+        {
+          return 1;
+        }
+
       get_printer_status(h, 0, NULL);
     }
 
-  /* Print graphic */
-  for(i = 0; i < l; i += 16)
-    {
-      write_rle(h, data_buffer + i, 16);
-      get_printer_status(h, 0, NULL);
-    }
-  free(data_buffer);
-
-  /* Center with padding */
-  for (j = 0; j < p; j++)
-    {
-      write_persist(h, "\x5a", 1);
-      get_printer_status(h, 0, NULL);
-    }
-
-  /* Print */
-  if(write_persist(h, "\x1a", 1) != 1)
-    {
-      return 1;
-    }
-  get_printer_status(h, 0, NULL);
   get_printer_status(h, 1, NULL);
   close(h);
   return 0;
