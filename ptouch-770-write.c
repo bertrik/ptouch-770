@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <math.h>
 
 #include <libudev.h>
 
@@ -33,6 +34,9 @@
 /* Media minimum and maximum width in mm */
 #define MEDIA_WIDTH_MIN 4
 #define MEDIA_WIDTH_MAX 24
+
+/* Minimum label length (at least E550W requires a minimum */
+#define MEDIA_LENGTH_MIN 152
 
 /* Allocate for output buffer */
 #define INIT_OUTPUT_SIZE 64
@@ -456,7 +460,7 @@ int get_printer_status(int h, int query, int *media_width)
 /* main */
 int main(int argc, char **argv)
 {
-  int h, i, l;
+  int h, i, j, l, p, lp;
   unsigned char *data_buffer;
   FILE *f;
 
@@ -604,6 +608,9 @@ int main(int argc, char **argv)
   l = read_pbm_file(f, &data_buffer);
   fclose(f);
 
+  p = ceil((MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
+  lp = l + p;
+
   if(l < 0)
     {
       fprintf(stderr, "Can't read bitmap file\n");
@@ -628,16 +635,16 @@ int main(int argc, char **argv)
     10: unused
   */
   memcpy(cmd_buffer,
-	 "\x1b\x69\x7a\x84", 4);                    /* 1 */
-  cmd_buffer[4] = 0;                                /* 2 */
-  cmd_buffer[5] = media_width;                      /* 3 */
-  cmd_buffer[6] = 0;                                /* 4 */
-  cmd_buffer[7] = (l / COL_HEIGHT) & 0xff;          /* 5 */
-  cmd_buffer[8] = ((l / COL_HEIGHT) >> 8) & 0xff;   /* 6 */
-  cmd_buffer[9] = ((l / COL_HEIGHT) >> 16) & 0xff;  /* 7 */
-  cmd_buffer[10] = ((l / COL_HEIGHT) >> 24) & 0xff; /* 8 */
-  cmd_buffer[11] = 0;                               /* 9 */
-  cmd_buffer[12] = 0;                               /* 10 */
+	 "\x1b\x69\x7a\x84", 4);                     /* 1 */
+  cmd_buffer[4] = 0;                                 /* 2 */
+  cmd_buffer[5] = media_width;                       /* 3 */
+  cmd_buffer[6] = 0;                                 /* 4 */
+  cmd_buffer[7] = (lp / COL_HEIGHT) & 0xff;          /* 5 */
+  cmd_buffer[8] = ((lp / COL_HEIGHT) >> 8) & 0xff;   /* 6 */
+  cmd_buffer[9] = ((lp / COL_HEIGHT) >> 16) & 0xff;  /* 7 */
+  cmd_buffer[10] = ((lp / COL_HEIGHT) >> 24) & 0xff; /* 8 */
+  cmd_buffer[11] = 0;                                /* 9 */
+  cmd_buffer[12] = 0;                                /* 10 */
 
   /* Auto cut before output */
   memcpy(cmd_buffer + 13, "\x1b\x69\x4d\x40", 4); 
@@ -665,12 +672,29 @@ int main(int argc, char **argv)
     {
       return 1;
     }
+
+  /* Center with padding */
+  for (j = 0; j < p; j++)
+    {
+      write_persist(h, "\x5a", 1);
+      get_printer_status(h, 0, NULL);
+    }
+
+  /* Print graphic */
   for(i = 0; i < l; i += 16)
     {
       write_rle(h, data_buffer + i, 16);
       get_printer_status(h, 0, NULL);
     }
   free(data_buffer);
+
+  /* Center with padding */
+  for (j = 0; j < p; j++)
+    {
+      write_persist(h, "\x5a", 1);
+      get_printer_status(h, 0, NULL);
+    }
+
   /* Print */
   if(write_persist(h, "\x1a", 1) != 1)
     {
