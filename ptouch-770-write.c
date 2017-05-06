@@ -1,7 +1,7 @@
 /*
   ptouch-770-write.c
 
-  Brother PT-H500/P700/E500 printer control utility.
+  Brother PT-H500/P700/E500/E550W printer control utility.
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -276,7 +276,7 @@ int write_persist(int h, void *buffer, size_t size)
 
 /*
   Write bytes, using write command and a version of PackBits
-  RLE for P-Touch PT-H500/P700/E500 label printers.
+  RLE for P-Touch PT-H500/P700/E500/E550W label printers.
 
   It's unclear what exactly are the limits of those printers,
   so only up to COL_HEIGHT bytes can be sent as either same or
@@ -474,7 +474,7 @@ int main(int argc, char **argv)
       return 1;
     }
 
-  /* Find Brother PT-H500/P700/E500 device */
+  /* Find Brother PT-H500/P700/E500/E550W device */
   int udev_failed = 0;
   struct udev *udev;
   struct udev_enumerate *udev_enum = NULL;
@@ -537,6 +537,7 @@ int main(int argc, char **argv)
 		     && !strcasecmp(vendor,"04f9") /* Brother */
 		     && (!strcasecmp(product,"205e") /* PT-H500 */
 			 || !strcasecmp(product,"205f") /* PT-E500 */
+			 || !strcasecmp(product,"2060") /* PT-E550W */
 			 || !strcasecmp(product,"2061") /* PT-P700 */))
 		    {
 		      devpath_found = udev_device_get_devnode(udev_dev);
@@ -563,7 +564,7 @@ int main(int argc, char **argv)
   
   if(!devpath)
     {
-      fprintf(stderr, "Brother PT-H500/P700/E500 printer not found\n");
+      fprintf(stderr, "Brother PT-H500/P700/E500/E500W printer not found\n");
       return 1;
     }
 
