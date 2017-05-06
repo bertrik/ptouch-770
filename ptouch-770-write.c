@@ -635,9 +635,7 @@ int main(int argc, char **argv)
      This was a command for number of pages before cut,
      apparently not used in this model.
   */
-  /*
   memcpy(cmd_buffer + 17, "\x1b\x69\x41\x01", 4);
-  */
 
   /* No chain printing (cut after the label) */
   memcpy(cmd_buffer + 21, "\x1b\x69\x4b\x08", 4); 
@@ -650,6 +648,20 @@ int main(int argc, char **argv)
 #endif
   /* Compression on */
   memcpy(cmd_buffer + 30, "\x4d\x02", 2);
+
+/*
+1b 40
+1b 69 61 01  raster
+1b 69 55 4a 00 0c 0a 00 27 00 00 02 00 00 02 00 00 00 ???
+1b 69 7a 84 00 18 00 aa 02 00 00 00 00 
+1b 69 4d 40
+1b 69 41 01
+1b 69 4b 04
+1b 69 64 0e 00 4d 02
+*/
+
+
+
   if(write_persist(h, cmd_buffer, 32) != 32)
     {
       return 1;
@@ -679,14 +691,12 @@ int main(int argc, char **argv)
       for (j = 0; j < p; j++)
         {
           write_persist(h, "\x5a", 1);
-          get_printer_status(h, 0, NULL);
         }
 
       /* Print graphic */
       for(i = 0; i < l; i += 16)
         {
           write_rle(h, data_buffer + i, 16);
-          get_printer_status(h, 0, NULL);
         }
       free(data_buffer);
 
@@ -694,7 +704,6 @@ int main(int argc, char **argv)
       for (j = 0; j < p; j++)
         {
           write_persist(h, "\x5a", 1);
-          get_printer_status(h, 0, NULL);
         }
 
       /* Print */
