@@ -679,7 +679,7 @@ int main(int argc, char **argv)
       l = read_pbm_file(f, &data_buffer);
       fclose(f);
 
-      p = ceil((MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
+      p = ceil((float) (MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
 
       if(l < 0)
         {
