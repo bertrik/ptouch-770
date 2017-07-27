@@ -4,6 +4,8 @@ use autodie;
 use Barcode::Code128;
 use File::Temp qw(tempfile);
 
+my $usb_id = 1;
+
 my $b = Barcode::Code128->new;
 $b->option(scale => 2);
 $b->option(height => 64);
@@ -25,6 +27,6 @@ while (@ARGV) {
     push @bitmaps, $fn;
 }
 
-system "./ptouch-770-write", @bitmaps;
+system "./ptouch-770-write", $usb_id, @bitmaps;
 
 unlink @bitmaps;
