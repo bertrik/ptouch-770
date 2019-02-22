@@ -446,6 +446,7 @@ int get_printer_status(int h, int query, int *media_width)
 	if(media_width)
 	{
 		*media_width = response[10];
+		printf("Tape width: %d\n", media_width);
 	}
 	/*
 	   int i;
@@ -461,6 +462,7 @@ int get_printer_status(int h, int query, int *media_width)
 int main(int argc, char **argv)
 {
 	int h, i, j, l, p, lp, fi;
+        h = 1;
 	unsigned char *data_buffer;
 	int chosen_nr = 0;
 	const char *chosen = NULL;
@@ -469,120 +471,13 @@ int main(int argc, char **argv)
 	int np = 0;
 	const char *paths[128];
 
-	if(argc < 3)
+	if(argc != 2)
 	{
-		fprintf(stderr, "Usage: %s printernr <file.pbm ...>\n", argv[0]);
-		fprintf(stderr, "First printer has printernr==0\n");
+		fprintf(stderr, "Usage: %s media_width < file.pbm\n", argv[0]);
+		fprintf(stderr, "Suggestion: convert <options> pbm:- | %s <media_width> | nc <host> 9100\n", argv[0]);
 		return 1;
 	}
 
-	/* Find Brother PT-H500/P700/E500/E550W device */
-	int udev_failed = 0;
-	struct udev *udev;
-	struct udev_enumerate *udev_enum = NULL;
-	struct udev_list_entry *udev_devices, *udev_entry;
-	struct udev_device *udev_dev, *udev_dev_usb;
-	const char *syspath, *vendor, *product;
-	char *devpath = NULL;
-
-	udev = udev_new();
-
-	if(udev)
-	{
-		udev_enum = udev_enumerate_new(udev);
-		if(!udev_enum)
-			udev_failed = 1;
-	}
-	else
-		udev_failed = 1;
-
-	if(!udev_failed
-			&& udev_enumerate_add_match_subsystem(udev_enum, "usbmisc") < 0)
-		udev_failed = 1;
-
-	if(!udev_failed
-			&& udev_enumerate_scan_devices(udev_enum) < 0)
-		udev_failed = 1;
-
-	if(!udev_failed
-			&& ((udev_devices = udev_enumerate_get_list_entry(udev_enum)) < 0))
-		udev_failed = 1;
-
-	if(!udev_failed)
-	{
-		udev_list_entry_foreach(udev_entry, udev_devices)
-		{
-			if(devpath == NULL)
-			{
-				syspath = udev_list_entry_get_name(udev_entry);
-				if(syspath)
-					udev_dev = udev_device_new_from_syspath(udev, syspath);
-				else
-					udev_dev = NULL;
-				if(udev_dev)
-				{
-					udev_dev_usb = 
-						udev_device_get_parent_with_subsystem_devtype(udev_dev,
-								"usb",
-								"usb_device");
-				}
-				else
-					udev_dev_usb = NULL;
-
-				if(udev_dev_usb)
-				{
-					vendor =
-						udev_device_get_sysattr_value(udev_dev_usb,"idVendor");
-					product = 
-						udev_device_get_sysattr_value(udev_dev_usb,"idProduct");
-					if(vendor && product
-							&& !strcasecmp(vendor,"04f9") /* Brother */
-							&& (!strcasecmp(product,"205e") /* PT-H500 */
-								|| !strcasecmp(product,"205f") /* PT-E500 */
-								|| !strcasecmp(product,"2060") /* PT-E550W */
-								|| !strcasecmp(product,"2061") /* PT-P700 */))
-					{
-						paths[np++] = strdup(udev_device_get_devnode(udev_dev));
-					}
-					udev_device_unref(udev_dev_usb);
-				}
-			}
-		}
-	}
-
-	if(udev_enum)
-		udev_enumerate_unref(udev_enum);
-
-	if(udev)
-		udev_unref(udev);
-
-	if(udev_failed)
-	{
-		fprintf(stderr, "Can't initialize udev\n");
-		return 1;
-	}
-
-	if(np == 0)
-	{
-		fprintf(stderr, "Brother PT-H500/P700/E500/E500W printer not found\n");
-		return 1;
-	}
-
-	/* Open device */
-	chosen_nr = atoi(argv[1]);
-	if (chosen_nr >= np)
-	{
-		fprintf(stderr, "Printer number %d out of range! (0 <= x < %d)\n", chosen_nr, np);
-		return 1;
-	}
-	chosen = paths[chosen_nr];
-	h = open(chosen, O_RDWR);
-	free(devpath);
-	if(h < 0)
-	{
-		fprintf(stderr, "Can't open printer %s", chosen);
-		return 1;
-	}
 
 	/* Initialization */
 	unsigned char cmd_buffer[102];
@@ -594,19 +489,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	int media_width = MEDIA_WIDTH_MAX;
-
-	/* Get status */
-	if(get_printer_status(h, 1, &media_width))
-	{
-		return 1;
-	}
-
-	if((media_width < MEDIA_WIDTH_MIN) || (media_width > MEDIA_WIDTH_MAX))
-	{
-		fprintf(stderr, "Replace label tape cartridge\n");
-		return 1;
-	}
+	int media_width = atoi(argv[1]);
 
 	/* Dynamic command mode setting: raster */
 	if(write_persist(h, "\x1b\x69\x61\x01", 4) != 4)
@@ -640,19 +523,19 @@ int main(int argc, char **argv)
 	cmd_buffer[12] = 0;                                /* 10 */
 
 	/* Auto cut before output */
-	memcpy(cmd_buffer + 13, "\x1b\x69\x4d\x40", 4); 
+	memcpy(cmd_buffer + 13, "\x1b\x69\x4d\x40", 4);
 
-	/* 
+	/*
 	   This was a command for number of pages before cut,
 	   apparently not used in this model.
 	 */
 	memcpy(cmd_buffer + 17, "\x1b\x69\x41\x01", 4);
 
 	/* No chain printing (cut after the label) */
-	memcpy(cmd_buffer + 21, "\x1b\x69\x4b\x08", 4); 
+	memcpy(cmd_buffer + 21, "\x1b\x69\x4b\x08", 4);
 #if 0
 	/* Margins 2mm */
-	memcpy(cmd_buffer + 25, "\x1b\x69\x64\x0e\x00", 5); 
+	memcpy(cmd_buffer + 25, "\x1b\x69\x64\x0e\x00", 5);
 #else
 	/* Margins 10 pixels */
 	memcpy(cmd_buffer + 25, "\x1b\x69\x64\x0a\x00", 5);
@@ -664,7 +547,7 @@ int main(int argc, char **argv)
 	   1b 40
 	   1b 69 61 01  raster
 	   1b 69 55 4a 00 0c 0a 00 27 00 00 02 00 00 02 00 00 00 ???
-	   1b 69 7a 84 00 18 00 aa 02 00 00 00 00 
+	   1b 69 7a 84 00 18 00 aa 02 00 00 00 00
 	   1b 69 4d 40
 	   1b 69 41 01
 	   1b 69 4b 04
@@ -678,55 +561,41 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	for (fi = 2; fi < argc; fi++)
+	l = read_pbm_file(stdin, &data_buffer);
+
+	p = ceil((float) (MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
+
+	if(l < 0)
 	{
-		f = fopen(argv[fi], "r");
-		if(!f)
-		{
-			fprintf(stderr, "Can't open bitmap file %s\n", argv[fi]);
-			return 1;
-		}
-
-		l = read_pbm_file(f, &data_buffer);
-		fclose(f);
-
-		p = ceil((float) (MEDIA_LENGTH_MIN - (l / COL_HEIGHT)) / 2);
-
-		if(l < 0)
-		{
-			fprintf(stderr, "Can't read bitmap file\n");
-			return 1;
-		}
-
-		/* Center with padding */
-		for (j = 0; j < p; j++)
-		{
-			write_persist(h, "\x5a", 1);
-		}
-
-		/* Print graphic */
-		for(i = 0; i < l; i += 16)
-		{
-			write_rle(h, data_buffer + i, 16);
-		}
-		free(data_buffer);
-
-		/* Center with padding */
-		for (j = 0; j < p; j++)
-		{
-			write_persist(h, "\x5a", 1);
-		}
-
-		/* Print */
-		if(write_persist(h, fi == argc - 1 ? "\x1a" : "\x0c", 1) != 1)
-		{
-			return 1;
-		}
-
-		get_printer_status(h, 0, NULL);
+		fprintf(stderr, "Can't read bitmap from stdin\n");
+		return 1;
 	}
 
-	get_printer_status(h, 1, NULL);
+	/* Center with padding */
+	for (j = 0; j < p; j++)
+	{
+		write_persist(h, "\x5a", 1);
+	}
+
+	/* Print graphic */
+	for(i = 0; i < l; i += 16)
+	{
+		write_rle(h, data_buffer + i, 16);
+	}
+	free(data_buffer);
+
+	/* Center with padding */
+	for (j = 0; j < p; j++)
+	{
+		write_persist(h, "\x5a", 1);
+	}
+
+	/* Print */
+	if(write_persist(h, "\x1a", 1) != 1)
+	{
+		return 1;
+	}
+
 	close(h);
 	return 0;
 }

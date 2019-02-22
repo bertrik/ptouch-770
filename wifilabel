@@ -1,0 +1,10 @@
+#!/bin/bash
+
+host="10.42.42.222"
+port="9100"
+
+width="$(curl -s http://10.42.42.222/general/status.html | grep -Po '\d+mm' | grep -Po '\d+')"
+size="$(($width*128/24))"
+echo "$width"mm tape detected, resizing to "$size"px
+
+convert -background white "$1" -resize x"$size" -gravity center -extent x128 pbm:- | ./ptouch-770-write $width | nc $host $port
