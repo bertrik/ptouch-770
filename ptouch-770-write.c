@@ -461,15 +461,9 @@ int get_printer_status(int h, int query, int *media_width)
 /* main */
 int main(int argc, char **argv)
 {
-	int h, i, j, l, p, lp, fi;
+	int h, i, j, l, p, lp;
         h = 1;
 	unsigned char *data_buffer;
-	int chosen_nr = 0;
-	const char *chosen = NULL;
-	FILE *f;
-	// this will fail if there are more than 128 printers connected
-	int np = 0;
-	const char *paths[128];
 
 	if(argc != 2)
 	{
