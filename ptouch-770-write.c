@@ -446,7 +446,7 @@ int get_printer_status(int h, int query, int *media_width)
 	if(media_width)
 	{
 		*media_width = response[10];
-		printf("Tape width: %d\n", media_width);
+		printf("Tape width: %d\n", *media_width);
 	}
 	/*
 	   int i;
